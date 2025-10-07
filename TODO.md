@@ -1,0 +1,6 @@
+- [x] Define CSS custom properties for light mode colors
+- [x] Create .dark-mode class with dark theme overrides
+- [x] Add toggle button to header
+- [x] Add JavaScript for theme toggling and localStorage
+- [x] Update popup styles to respect theme
+- [x] Test dark and light modes
