@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/ol@v8.2.0/dist/ol.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v8.2.0/ol.css" />
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <style>
+        /* 🌿 Background and global style */
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, rgba(30, 100, 30, 0.8), rgba(80, 150, 80, 0.7));
+            backdrop-filter: blur(12px);
+            color: #fff;
+            overflow: hidden;
+        }
+
+        #container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* 🌫️ Glass header */
+        #header {
+            background: rgba(255, 255, 255, 0.1);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(10px);
+            padding: 10px 15px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        #header h1 {
+            margin-bottom: 8px;
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: #eaffea;
+        }
+
+        #location-input {
+            padding: 8px;
+            border: none;
+            border-radius: 8px;
+            outline: none;
+            width: 200px;
+            margin-right: 6px;
+            transition: box-shadow 0.3s ease;
+        }
+
+        #location-input:focus {
+            box-shadow: 0 0 8px rgba(0, 255, 100, 0.6);
+        }
+
+        #suggestions-box {
+            position: absolute;
+            top: 85px;
+            /* Adjust based on header height */
+            left: 50%;
+            transform: translateX(-50%);
+            width: auto;
+            max-height: 180px;
+            overflow-y: auto;
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            display: none;
+            z-index: 10000;
+        }
+
+        .suggestion-item {
+            padding: 8px 10px;
+            color: #eaffea;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .suggestion-item:hover {
+            background: rgba(0, 255, 120, 0.3);
+        }
+
+
+
+        /* 🌱 Buttons with hover glow */
+        .btn {
+            background: rgba(0, 150, 80, 0.6);
+            border: 1px solid rgba(0, 255, 120, 0.5);
+            color: white;
+            padding: 6px 12px;
+            margin: 3px;
+            cursor: pointer;
+            font-size: 14px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+
+        .btn:hover {
+            background: rgba(0, 255, 120, 0.8);
+            color: #003d1a;
+            transform: translateY(-2px);
+            box-shadow: 0 0 10px rgba(0, 255, 100, 0.7);
+        }
+
+        .btn:active {
+            transform: scale(0.97);
+        }
+
+        /* 🗺️ Map container */
+        #map_86102898d774a3266f69b9c0dbb94b05 {
+            width: 100%;
+            height: 100%;
+            flex-grow: 1;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* 📦 Movable area info box (bottom-right default) */
+        #area-info {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(12px);
+            color: #fff;
+            padding: 12px;
+            border-radius: 12px;
+            min-width: 180px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            cursor: move;
+            z-index: 1000;
+        }
+
+        #area-info strong {
+            font-size: 15px;
+            color: #e6ffe6;
+        }
+
+        #area-values {
+            width: 100%;
+            height: 90px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 5px;
+            resize: none;
+            outline: none;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        #area-values:focus {
+            box-shadow: 0 0 6px rgba(0, 255, 120, 0.6);
+        }
+
+        .leaflet-container {
+            font-size: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container">
+        <div id="header">
+            <h1>🌍 Smart Map Explorer</h1>
+            <input type="text" id="location-input" placeholder="Enter a place name" />
+            <button id="search-btn" class="btn"><i class="fa fa-search"></i> Search</button>
+            <div id="suggestions-box"></div>
+
+            <button id="refresh-btn" class="btn"><i class="fa fa-sync"></i> Refresh</button>
+            <button id="draw-polygon-btn" class="btn"><i class="fa fa-draw-polygon"></i> Polygon</button>
+            <button id="draw-rectangle-btn" class="btn"><i class="fa fa-vector-square"></i> Rectangle</button>
+            <button id="stop-drawing-btn" class="btn"><i class="fa fa-stop"></i> Stop</button>
+            <button id="clear-btn" class="btn"><i class="fa fa-eraser"></i> Clear</button>
+        </div>
+        <div class="folium-map" id="map_86102898d774a3266f69b9c0dbb94b05"></div>
+
+        <div id="area-info">
+            <strong>Selected Area:</strong>
+            <textarea id="area-values" readonly>None</textarea>
+        </div>
+    </div>
+
+    <script>
+        // 🗺️ Initialize map
+        var map = new ol.Map({
+            target: 'map_86102898d774a3266f69b9c0dbb94b05',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.OSM()
+                })
+            ],
+            view: new ol.View({
+                center: ol.proj.fromLonLat([-122.4194, 37.7749]),
+                zoom: 12
+            })
+        });
+
+        // 📍 Marker
+        var markerFeature = new ol.Feature({
+            geometry: new ol.geom.Point(ol.proj.fromLonLat([-122.4194, 37.7749])),
+            name: 'San Francisco'
+        });
+
+        var markerSource = new ol.source.Vector({ features: [markerFeature] });
+        var markerLayer = new ol.layer.Vector({ source: markerSource });
+        map.addLayer(markerLayer);
+
+        // 🏷️ Popup
+        var popupElement = document.createElement('div');
+        popupElement.innerHTML = 'San Francisco';
+        popupElement.style.display = 'none';
+        popupElement.style.backgroundColor = 'rgba(255,255,255,0.9)';
+        popupElement.style.color = '#000';
+        popupElement.style.border = '1px solid #333';
+        popupElement.style.padding = '5px 10px';
+        popupElement.style.borderRadius = '6px';
+        document.body.appendChild(popupElement);
+
+        var popup = new ol.Overlay({
+            element: popupElement,
+            positioning: 'bottom-center',
+            stopEvent: false,
+            offset: [0, -40]
+        });
+        map.addOverlay(popup);
+
+        // Show popup on click
+        map.on('click', function (evt) {
+            var feature = map.forEachFeatureAtPixel(evt.pixel, function (feature) {
+                return feature;
+            });
+            if (feature) {
+                var coordinates = feature.getGeometry().getCoordinates();
+                popup.setPosition(coordinates);
+                popupElement.innerHTML = feature.get('name');
+                popupElement.style.display = 'block';
+            } else {
+                popupElement.style.display = 'none';
+            }
+        });
+
+        // ✏️ Draw source and layer
+        var drawSource = new ol.source.Vector();
+        var drawLayer = new ol.layer.Vector({
+            source: drawSource,
+            style: new ol.style.Style({
+                fill: new ol.style.Fill({ color: 'rgba(0, 255, 0, 0.3)' }),
+                stroke: new ol.style.Stroke({ color: '#00ff88', width: 3 })
+            })
+        });
+        map.addLayer(drawLayer);
+
+        var drawPolygon = new ol.interaction.Draw({ source: drawSource, type: 'Polygon' });
+        var drawRectangle = new ol.interaction.Draw({
+            source: drawSource,
+            type: 'Circle',
+            geometryFunction: ol.interaction.Draw.createBox()
+        });
+
+        var currentDrawInteraction = null;
+
+        function startDrawing(interaction) {
+            if (currentDrawInteraction) map.removeInteraction(currentDrawInteraction);
+            map.addInteraction(interaction);
+            currentDrawInteraction = interaction;
+        }
+
+        function stopDrawing() {
+            if (currentDrawInteraction) {
+                map.removeInteraction(currentDrawInteraction);
+                currentDrawInteraction = null;
+            }
+        }
+
+        // 🧮 Calculate area
+        function calculateArea(feature) {
+            var geom = feature.getGeometry();
+            var area = ol.sphere.getArea(geom, { projection: 'EPSG:3857' });
+            var acres = area * 0.000247105;
+            var cents = area * 0.0247105;
+            return { area: area, acres: acres, cents: cents };
+        }
+
+        function showAreaInfo(areaObj) {
+            var text = `Area: ${areaObj.area.toFixed(2)} m²\n` +
+                `Acres: ${areaObj.acres.toFixed(4)}\n` +
+                `Cents: ${areaObj.cents.toFixed(2)}`;
+            document.getElementById('area-values').innerText = text;
+        }
+
+        drawPolygon.on('drawend', function (evt) {
+            stopDrawing();
+            showAreaInfo(calculateArea(evt.feature));
+        });
+
+        drawRectangle.on('drawend', function (evt) {
+            stopDrawing();
+            showAreaInfo(calculateArea(evt.feature));
+        });
+
+        document.getElementById('clear-btn').addEventListener('click', function () {
+            drawSource.clear();
+            stopDrawing();
+            document.getElementById('area-values').innerText = 'None';
+        });
+
+        document.getElementById('draw-polygon-btn').addEventListener('click', function () {
+            startDrawing(drawPolygon);
+        });
+
+        document.getElementById('draw-rectangle-btn').addEventListener('click', function () {
+            startDrawing(drawRectangle);
+        });
+
+        document.getElementById('stop-drawing-btn').addEventListener('click', stopDrawing);
+
+        // 🌍 Search
+        async function searchLocation() {
+            const query = document.getElementById('location-input').value;
+            if (!query) return;
+
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                if (data.length > 0) {
+                    const lat = parseFloat(data[0].lat);
+                    const lon = parseFloat(data[0].lon);
+                    const placeName = data[0].display_name;
+                    map.getView().setCenter(ol.proj.fromLonLat([lon, lat]));
+                    map.getView().setZoom(12);
+                    markerFeature.getGeometry().setCoordinates(ol.proj.fromLonLat([lon, lat]));
+                    markerFeature.set('name', placeName);
+                    popup.setPosition(ol.proj.fromLonLat([lon, lat]));
+                    popupElement.innerHTML = placeName;
+                    popupElement.style.display = 'block';
+                } else alert('Location not found');
+            } catch (error) {
+                console.error(error);
+                alert('Error searching location');
+            }
+        }
+
+        document.getElementById('search-btn').addEventListener('click', searchLocation);
+        document.getElementById('location-input').addEventListener('keypress', e => {
+            if (e.key === 'Enter') searchLocation();
+        });
+
+
+        // 🌟 Suggestions
+
+
+        const locationInput = document.getElementById('location-input');
+        const suggestionsBox = document.getElementById('suggestions-box');
+        let suggestionTimeout;
+
+        // 🪄 Fetch location suggestions
+        async function fetchSuggestions(query) {
+            if (!query || query.length < 2) {
+                suggestionsBox.style.display = 'none';
+                return;
+            }
+
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`);
+                const data = await response.json();
+
+                // Clear and display results
+                suggestionsBox.innerHTML = '';
+                if (data.length > 0) {
+                    data.forEach(item => {
+                        const div = document.createElement('div');
+                        div.classList.add('suggestion-item');
+                        div.textContent = item.display_name;
+                        div.addEventListener('click', () => {
+                            locationInput.value = item.display_name;
+                            suggestionsBox.style.display = 'none';
+                            map.getView().setCenter(ol.proj.fromLonLat([parseFloat(item.lon), parseFloat(item.lat)]));
+                            map.getView().setZoom(12);
+                            markerFeature.getGeometry().setCoordinates(ol.proj.fromLonLat([parseFloat(item.lon), parseFloat(item.lat)]));
+                            markerFeature.set('name', item.display_name);
+                            popup.setPosition(ol.proj.fromLonLat([parseFloat(item.lon), parseFloat(item.lat)]));
+                            popupElement.innerHTML = item.display_name;
+                            popupElement.style.display = 'block';
+                        });
+                        suggestionsBox.appendChild(div);
+                    });
+                    suggestionsBox.style.display = 'block';
+                } else {
+                    suggestionsBox.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Suggestion error:', error);
+                suggestionsBox.style.display = 'none';
+            }
+        }
+
+        // ⌨️ Listen to typing in input
+        locationInput.addEventListener('input', function () {
+            clearTimeout(suggestionTimeout);
+            suggestionTimeout = setTimeout(() => {
+                fetchSuggestions(locationInput.value);
+            }, 400); // debounce typing (wait 400ms)
+        });
+
+        // Hide suggestions when clicking outside
+        document.addEventListener('click', function (event) {
+            if (!suggestionsBox.contains(event.target) && event.target !== locationInput) {
+                suggestionsBox.style.display = 'none';
+            }
+        });
+
+
+
+
+
+        // 🖱️ Make area info draggable
+        const areaBox = document.getElementById('area-info');
+        let isDragging = false, offsetX, offsetY;
+
+        areaBox.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            offsetX = e.clientX - areaBox.offsetLeft;
+            offsetY = e.clientY - areaBox.offsetTop;
+            areaBox.style.transition = "none";
+        });
+
+        document.addEventListener('mouseup', () => isDragging = false);
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                areaBox.style.left = (e.clientX - offsetX) + 'px';
+                areaBox.style.top = (e.clientY - offsetY) + 'px';
+                areaBox.style.bottom = 'auto';
+                areaBox.style.right = 'auto';
+            }
+        });
+    </script>
+</body>
+
+</html>
