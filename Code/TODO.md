@@ -1,0 +1,8 @@
+- [x] Update head section: Remove Leaflet scripts/CSS, add OpenLayers script/CSS
+- [x] Rewrite map initialization: Use ol.Map with OSM tile layer
+- [x] Add marker and popup using OpenLayers
+- [x] Implement draw interactions for polygon and rectangle
+- [x] Update search functionality to work with OpenLayers map
+- [x] Update clear button to clear drawn features
+- [x] Add UI controls for drawing tools (buttons to toggle polygon/rectangle drawing)
+- [x] Test the map in browser

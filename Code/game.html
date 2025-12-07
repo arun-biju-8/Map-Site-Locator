@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive Pixel Farm</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --font-pixel: 'Press Start 2P', cursive;
+      --color-water: #844021;
+      --color-grass: #79d45e;
+      --color-grass-shadow: #589b45;
+      --color-text-light: #fff;
+      --color-dark: #333;
+    }
+
+    /* --- General Setup --- */
+    * {
+      font-family: var(--font-pixel);
+      box-sizing: border-box;
+      user-select: none;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background-color: var(--color-water);
+      overflow: hidden;
+      --cursor-plant: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevrons-down"><polyline points="7 13 12 18 17 13"></polyline><polyline points="7 6 12 11 17 6"></polyline></svg>'), auto;
+      --cursor-harvest: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-scissors"><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><line x1="20" y1="4" x2="8.12" y2="15.88"></line><line x1="14.47" y1="14.48" x2="20" y2="20"></line><line x1="8.12" y1="8.12" x2="12" y2="12"></line></svg>'), auto;
+    }
+    body.plant-mode { cursor: var(--cursor-plant); }
+    body.harvest-mode { cursor: var(--cursor-harvest); }
+
+    /* --- Game Layout --- */
+    .game-container {
+      position: relative;
+      width: 700px; /* 14 tiles * 50px */
+      height: 600px; /* 12 tiles * 50px */
+    }
+
+    .island-grid {
+      display: grid;
+      grid-template-columns: repeat(14, 50px);
+      grid-template-rows: repeat(12, 50px);
+      position: relative;
+      background-color: var(--color-grass);
+      box-shadow: 0 8px 0 0 var(--color-grass-shadow);
+      clip-path: polygon(
+        10% 10%, 65% 10%, 65% 25%, 85% 25%, 85% 75%,
+        70% 75%, 70% 85%, 50% 85%, 50% 95%, 40% 95%,
+        40% 85%, 20% 85%, 20% 75%, 5% 75%, 5% 30%, 10% 30%
+      );
+    }
+    
+    /* --- Items on the Grid --- */
+    .item {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 28px;
+    }
+    .farm-cell:hover {
+      background-color: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+    }
+    .planted-crop {
+        animation: plant-grow 0.3s ease-out;
+    }
+    @keyframes plant-grow {
+        from { transform: scale(0.5); }
+        to { transform: scale(1); }
+    }
+
+    /* Specific item adjustments */
+    .tree { font-size: 40px; }
+    .boat { font-size: 40px; transform: rotate(15deg); }
+    
+    /* Soil type visual indicators */
+    .soil-indicator {
+        font-size: 14px;
+        opacity: 0.5;
+        position: absolute;
+        bottom: 2px;
+        right: 2px;
+    }
+
+    /* --- UI Panels --- */
+    .resources-panel {
+        position: absolute;
+        top: 15px;
+        right: 15px; /* MODIFIED: Positioned to the right */
+        z-index: 10;
+    }
+    .resource-display { display: flex; gap: 10px; }
+    .resource-box {
+      background-color: rgba(0, 0, 0, 0.5);
+      color: var(--color-text-light);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 2px solid var(--color-dark);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+    .resource-box .icon { font-size: 18px; }
+
+    .controls-panel { /* NEW: Panel for all controls */
+        position: absolute;
+        top: 15px;
+        left: -20%;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        align-items: flex-start;
+    }
+    
+    .tool-selector-container { display: flex; gap: 10px; }
+    .plant-selector { 
+        display: flex; 
+        flex-direction: column; /* MODIFIED: Stack plants vertically */
+        gap: 10px;
+    }
+
+    .tool-selector, .plant-selector-item {
+        background-color: rgba(0, 0, 0, 0.3);
+        border: 2px solid var(--color-dark);
+        color: var(--color-text-light);
+        padding: 10px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.2s, transform 0.2s;
+        display: flex; /* Ensures content aligns well */
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+    }
+    .tool-selector:hover, .plant-selector-item:hover {
+        background-color: rgba(0, 0, 0, 0.6);
+    }
+    .tool-selector.active, .plant-selector-item.active {
+        background-color: #f7b42f;
+        color: var(--color-dark);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 0 var(--color-dark);
+    }
+    .tool-selector {
+        font-size: 16px; /* Make tool icons slightly bigger */
+    }
+
+    #message-box {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: rgba(0,0,0,0.7);
+        color: var(--color-text-light);
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-size: 12px;
+        z-index: 20;
+        opacity: 0;
+        transition: opacity 0.5s;
+    }
+    #message-box.show { opacity: 1; }
+/* The container for the sun. Its position is relative,
+   so the sun's absolute position is bound to it. */
+/* 1. Style the container for the sun */
+.sky {
+  position: absolute; top:0px; /* Establishes a positioning context for the sun */
+  width: 100%;       /* Takes the full width of its parent */
+  height: 100px;     /* A fixed height for the sky */
+  border-radius: 10px;
+  overflow: hidden;  /* Hides the sun when it moves outside the container */
+
+  /* Apply the sky color-change animation */
+  animation: sky-cycle 20s linear infinite;
+}
+
+/* 2. Style the sun element */
+.sun {
+  position: absolute;
+  font-size: 40px;
+  
+  /* Apply the sun movement animation */
+  animation: day-cycle 20s linear infinite;
+}
+
+/* 3. Define the keyframes for the sun's movement */
+@keyframes day-cycle {
+  0% {
+    /* Starts on the left, slightly low (sunrise) */
+    transform: translate(-50px, 20px);
+  }
+  50% {
+    /* Moves to the middle, and goes up high (high noon) */
+    transform: translate(calc(50vw - 50%), -20px);
+  }
+  100% {
+    /* Ends on the right, slightly low (sunset) */
+    transform: translate(calc(100vw - 10px), 20px);
+  }
+}
+
+/* 4. (Optional) Define keyframes for the sky's day/night cycle */
+@keyframes sky-cycle {
+  0%   { background: #87CEEB; } /* Day blue */
+  40%  { background: #87CEEB; } /* Stays day blue */
+  60%  { background: #0c1445; } /* Fades to night blue */
+  90%  { background: #0c1445; } /* Stays night blue */
+  100% { background: #87CEEB; } /* Fades back to day */
+} </style>
+</head>
+<body>
+<div class="sky">
+  <div class="sun">☀</div>
+</div>
+<br><br><br><br>
+<div class="game-container">
+  <div class="resources-panel">
+    <div class="resource-display">
+      <div class="resource-box" title="Harvested Sunflowers">
+        <span class="icon">🌻</span><span class="amount" id="count-sunflower-harvested">0</span>
+      </div>
+      <div class="resource-box" title="Harvested Tulips">
+        <span class="icon">🌷</span><span class="amount" id="count-tulip-harvested">0</span>
+      </div>
+      <div class="resource-box" title="Harvested Cacti">
+        <span class="icon">🌵</span><span class="amount" id="count-cactus-harvested">0</span>
+      </div>
+       <div class="resource-box" title="Harvested Mushrooms">
+        <span class="icon">🍄</span><span class="amount" id="count-mushroom-harvested">0</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls-panel">
+    <div class="tool-selector-container">
+        <div class="tool-selector active" id="tool-plant" title="Plant Mode (P)">⛏</div>
+        <div class="tool-selector" id="tool-harvest" title="Harvest Mode (H)">🌿</div>
+    </div>
+    <div class="plant-selector" id="plant-selector">
+        <div class="plant-selector-item active" data-plant="sunflower" title="Sunflower Seeds">
+            🌻 <span id="count-sunflower-seeds">10</span>
+        </div>
+        <div class="plant-selector-item" data-plant="tulip" title="Tulip Seeds">
+            🌷 <span id="count-tulip-seeds">5</span>
+        </div>
+        <div class="plant-selector-item" data-plant="cactus" title="Cactus Seeds">
+            🌵 <span id="count-cactus-seeds">5</span>
+        </div>
+        <div class="plant-selector-item" data-plant="mushroom" title="Mushroom Spores">
+            🍄 <span id="count-mushroom-seeds">5</span>
+        </div>
+    </div>
+  </div>
+  
+  <div id="message-box"></div>
+
+  <div class="island-grid" id="island-grid">
+    <div class="item tree" style="grid-area: 2 / 5;">🌳</div>
+    <div class="item tree" style="grid-area: 2 / 12;">🌳</div>
+    <div class="item tree" style="grid-area: 6 / 5;">🌳</div>
+    <div class="item tree" style="grid-area: 11 / 12;">🌳</div>
+    <div class="item character" style="grid-area: 3 / 4;">👩‍🌾</div>
+    <div class="item boat" style="grid-area: 11 / 6;">⛵</div>
+  </div>
+</div>
+
+<script>
+// The JavaScript remains the same as it correctly targets elements by their IDs.
+document.addEventListener('DOMContentLoaded', () => {
+
+    // --- GAME STATE & CONFIGURATION ---
+    const config = {
+        rows: 12,
+        cols: 14,
+        staticItems: [ // [row, col]
+            [2,5], [2,12], [6,5], [11,12], [3,4], [11,6]
+        ],
+        plants: {
+            sunflower: { icon: '🌻', soils: ['fertile', 'sandy'] },
+            tulip: { icon: '🌷', soils: ['fertile'] },
+            cactus: { icon: '🌵', soils: ['sandy'] },
+            mushroom: { icon: '🍄', soils: ['shady'] }
+        }
+    };
+    
+    let state = {
+        currentTool: 'plant', // 'plant' or 'harvest'
+        selectedPlant: 'sunflower',
+        plantedCrops: {}, // "row-col": "plantType"
+        inventory: {
+            seeds: { sunflower: 10, tulip: 5, cactus: 5, mushroom: 5 },
+            harvested: { sunflower: 0, tulip: 0, cactus: 0, mushroom: 0 }
+        }
+    };
+
+    // --- DOM ELEMENTS ---
+    const grid = document.getElementById('island-grid');
+    const body = document.body;
+    const messageBox = document.getElementById('message-box');
+    const plantSelectorItems = document.querySelectorAll('.plant-selector-item');
+    const toolPlant = document.getElementById('tool-plant');
+    const toolHarvest = document.getElementById('tool-harvest');
+
+    // --- GAME LOGIC ---
+
+    /** Determines the soil type based on grid coordinates */
+    function getSoilType(row, col) {
+        // Sandy soil near the bottom/water
+        if (row >= 9) return 'sandy';
+        // Shady soil behind the top-left tree
+        if (row <= 3 && col <= 5) return 'shady';
+        // Everything else is fertile
+        return 'fertile';
+    }
+
+    /** Displays a message to the user for a short duration */
+    function showMessage(text) {
+        messageBox.textContent = text;
+        messageBox.classList.add('show');
+        setTimeout(() => messageBox.classList.remove('show'), 2000);
+    }
+    
+    /** Updates all the UI counters from the game state */
+    function updateUI() {
+        // Update seed counts
+        for (const plant in state.inventory.seeds) {
+            const el = document.getElementById(count-${plant}-seeds);
+            if (el) el.textContent = state.inventory.seeds[plant];
+        }
+        // Update harvested counts
+        for (const plant in state.inventory.harvested) {
+            const el = document.getElementById(count-${plant}-harvested);
+            if (el) el.textContent = state.inventory.harvested[plant];
+        }
+        // Update active tool and plant styles
+        body.classList.toggle('plant-mode', state.currentTool === 'plant');
+        body.classList.toggle('harvest-mode', state.currentTool === 'harvest');
+        toolPlant.classList.toggle('active', state.currentTool === 'plant');
+        toolHarvest.classList.toggle('active', state.currentTool === 'harvest');
+        
+        plantSelectorItems.forEach(item => {
+            item.classList.toggle('active', item.dataset.plant === state.selectedPlant);
+        });
+    }
+
+    /** Handles clicks on the farm cells */
+    function onCellClick(cell, r, c) {
+        const key = ${r}-${c};
+
+        if (state.currentTool === 'plant') {
+            handlePlanting(cell, key, r, c);
+        } else if (state.currentTool === 'harvest') {
+            handleHarvesting(cell, key);
+        }
+    }
+    
+    function handlePlanting(cell, key, r, c) {
+        if (state.plantedCrops[key]) {
+            showMessage("Something is already planted here!");
+            return;
+        }
+
+        const plant = config.plants[state.selectedPlant];
+        const soil = getSoilType(r, c);
+
+        if (!plant.soils.includes(soil)) {
+            showMessage(${plant.icon} cannot grow in ${soil} soil.);
+            return;
+        }
+        
+        if (state.inventory.seeds[state.selectedPlant] <= 0) {
+            showMessage(No ${plant.icon} seeds left!);
+            return;
+        }
+
+        // All checks passed, let's plant!
+        state.inventory.seeds[state.selectedPlant]--;
+        state.plantedCrops[key] = state.selectedPlant;
+        cell.textContent = plant.icon;
+        cell.classList.add('planted-crop');
+        showMessage(Planted a ${state.selectedPlant}!);
+        updateUI();
+    }
+    
+    function handleHarvesting(cell, key) {
+        if (!state.plantedCrops[key]) {
+            showMessage("Nothing to harvest here.");
+            return;
+        }
+        
+        const cropType = state.plantedCrops[key];
+        state.inventory.harvested[cropType]++;
+        delete state.plantedCrops[key];
+
+        cell.textContent = '';
+        cell.classList.remove('planted-crop');
+        // Re-add the soil indicator
+        cell.appendChild(createSoilIndicator(getSoilType(parseInt(cell.dataset.row), parseInt(cell.dataset.col))));
+        
+        showMessage(Harvested a ${cropType}!);
+        updateUI();
+    }
+    
+    /** Creates a small visual indicator for soil type */
+    function createSoilIndicator(soilType) {
+        const indicator = document.createElement('div');
+        indicator.className = 'soil-indicator';
+        if (soilType === 'sandy') indicator.textContent = '〰';
+        if (soilType === 'shady') indicator.textContent = '🌙';
+        return indicator;
+    }
+
+    // --- INITIALIZATION ---
+    
+    /** Sets up the interactive grid cells */
+    function createInteractiveGrid() {
+        const isOccupied = (r, c) => config.staticItems.some(([or, oc]) => or === r && oc === c);
+        
+        for (let r = 1; r <= config.rows; r++) {
+            for (let c = 1; c <= config.cols; c++) {
+                if (isOccupied(r, c)) continue;
+
+                const cell = document.createElement('div');
+                cell.className = 'item farm-cell';
+                cell.style.gridArea = ${r} / ${c};
+                cell.dataset.row = r;
+                cell.dataset.col = c;
+                
+                // Add soil type indicator
+                cell.appendChild(createSoilIndicator(getSoilType(r, c)));
+                
+                cell.addEventListener('click', () => onCellClick(cell, r, c));
+                grid.appendChild(cell);
+            }
+        }
+    }
+    
+    /** Sets up all event listeners for controls */
+    function setupEventListeners() {
+        // Tool selection
+        toolPlant.addEventListener('click', () => { state.currentTool = 'plant'; updateUI(); });
+        toolHarvest.addEventListener('click', () => { state.currentTool = 'harvest'; updateUI(); });
+
+        // Plant selection
+        plantSelectorItems.forEach(item => {
+            item.addEventListener('click', () => {
+                state.selectedPlant = item.dataset.plant;
+                state.currentTool = 'plant'; // Switch to plant mode automatically
+                updateUI();
+            });
+        });
+
+        // Keyboard shortcuts
+        window.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'p') { state.currentTool = 'plant'; updateUI(); }
+            if (e.key.toLowerCase() === 'h') { state.currentTool = 'harvest'; updateUI(); }
+        });
+    }
+
+    // --- START THE GAME ---
+    createInteractiveGrid();
+    setupEventListeners();
+    updateUI(); // Initial UI render
+});
+</script>
+</body>
+</html>
